@@ -206,6 +206,12 @@ class _HomePageState extends State<HomePage> {
 
     if (targetDate == null) return;
 
+    // Benachrichtigungen nur auf Android/iOS planen (Linux/Web nicht unterstützt)
+    if (!(defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS)) {
+      return;
+    }
+
     final daysRemaining = _calculateDaysRemaining();
 
     const AndroidNotificationDetails androidDetails =
@@ -222,7 +228,7 @@ class _HomePageState extends State<HomePage> {
       iOS: DarwinNotificationDetails(),
     );
 
-    // Plane tägliche Benachrichtigung um 9:00 Uhr
+  // Plane tägliche Benachrichtigung (einfaches Intervall)
     await flutterLocalNotificationsPlugin.periodicallyShow(
       0,
       'Nur noch...',
@@ -286,6 +292,21 @@ class _HomePageState extends State<HomePage> {
       await _saveData();
       await _scheduleDailyNotification();
     }
+  }
+
+  Future<void> _resetAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    await flutterLocalNotificationsPlugin.cancelAll();
+    if (!mounted) return;
+    setState(() {
+      targetDate = null;
+      initialDaysCount = null;
+      checkedDates.clear();
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('App-Daten zurückgesetzt')));
   }
 
   @override
@@ -419,6 +440,37 @@ class _HomePageState extends State<HomePage> {
                           Navigator.pop(context);
                         },
                         child: const Text('Zurücksetzen'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.delete_forever),
+              title: const Text('App-Daten löschen (alles)'),
+              subtitle: const Text('Datum, abgehakte Tage, Benachrichtigungen'),
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Alle Daten löschen?'),
+                    content: const Text(
+                      'Dies setzt die App vollständig zurück. Zieldatum, abgehakte Tage und Einstellungen werden gelöscht.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Abbrechen'),
+                      ),
+                      FilledButton(
+                        onPressed: () async {
+                          Navigator.pop(context); // close dialog
+                          Navigator.pop(context); // close drawer
+                          await _resetAllData();
+                        },
+                        child: const Text('Löschen'),
                       ),
                     ],
                   ),
